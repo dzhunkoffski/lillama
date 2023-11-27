@@ -1,17 +1,35 @@
 import torch
+from torch import Tensor
+from torch.nn.utils import clip_grad_norm_
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
 from tqdm import tqdm
 from src.utils.wandb_logger import WandbLogger
+from src.model.samplers import generate_nucleus
 import math
+
+import wandb
 
 sns.set_style('whitegrid')
 plt.rcParams.update({'font.size': 15})
 
-class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
+@torch.no_grad()
+def get_grad_norm(model, norm_type=2):
+    parameters = model.parameters()
+    if isinstance(parameters, torch.Tensor):
+        parameters = [parameters]
+    parameters = [p for p in parameters if p.grad is not None]
+    total_norm = torch.norm(
+        torch.stack(
+            [torch.norm(p.grad.detach(), norm_type).cpu() for p in parameters]
+        ),
+        norm_type,
+    )
+    return total_norm.item()
 
+class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer, warmup_steps: int, max_steps: int):
         self.warmup = warmup_steps
         self.max_steps = max_steps
@@ -26,10 +44,11 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc):
+def training_epoch(model, optimzier, criterion, train_loader, device, epoch, logger, grad_clipping):
     train_loss = 0.0
     model.train()
-    for indices, lengths in tqdm(train_loader, desc=tqdm_desc):
+    for i, (indices, lengths) in tqdm(list(enumerate(train_loader))):
+        logger.set_step(step=(epoch-1) * len(train_loader.dataset) + i)
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
 
@@ -38,15 +57,18 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc)
         logits = torch.permute(logits, (0, 2, 1))
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
+        clip_grad_norm_(model.parameters(), max_norm=grad_clipping)
         optimzier.step()
 
+        logger.log_state('train_loss', loss.item())
+        logger.log_state('grad_norm', get_grad_norm(model))
         train_loss += loss.item() * indices.shape[0]
     
     train_loss /= len(train_loader.dataset)
     return train_loss
 
 @torch.no_grad()
-def validation_epoch(model, critetion, val_loader, device, tqdm_desc):
+def validation_epoch(model, critetion, val_loader, device, epoch):
     val_loss = 0.0
     model.eval()
     for indices, lengths in tqdm(val_loader):
@@ -61,30 +83,41 @@ def validation_epoch(model, critetion, val_loader, device, tqdm_desc):
     val_loss /= len(val_loader.dataset)
     return val_loss
 
-def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False):
+def train(
+        model, optimizer, criterion, train_loader, val_loader, 
+        num_epochs, device, logger: WandbLogger, grad_clipping: float = 1000.0, 
+        scheduler=None, log_output: bool = False):
     train_losses, val_losses = [], []
 
     for epoch in range(1, num_epochs + 1):
-        if log_output:
-            print(f'=== Epoch {epoch} ===')
+        print(f'=== Epoch {epoch} ===')
         train_loss = training_epoch(
-            model, optimizer, criterion, train_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
+            model, optimizer, criterion, train_loader, device, epoch=epoch, logger=logger, grad_clipping=grad_clipping
         )
         val_loss = validation_epoch(
-            model, criterion, val_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
+            model, criterion, val_loader, device, epoch=epoch
         )
-
-        results = {}
         if scheduler is not None:
             scheduler.step()
-            results["learning rate"] = scheduler.get_last_lr()[0]
-        results["train_loss"] = train_loss
-        results["val loss"] = val_loss
-        train_losses += [train_loss]
-        val_losses += [val_loss]
+            logger.log_state("lr", scheduler.get_last_lr()[0])
 
-        logger.log_metrics(results)
+        logger.log_state('val_loss', val_loss)
+        text_table = log_predictions(
+            model, train_loader.dataset.tokenizer, batch_size=10, device=device, 
+            token_len=100, prefix=torch.tensor([train_loader.dataset.bos_id]),
+            vocab_size=train_loader.dataset.vocab_size
+        )
+        logger.log_state('text_table', text_table)
+    
+def log_predictions(model, tokenizer, batch_size: int, device, token_len: int, prefix: Tensor, vocab_size: int):
+    generated_ids = generate_nucleus(
+        model, tokenizer, batch_size=batch_size, 
+        device=device, prefix=prefix, max_len=token_len, nucleus=0.9, vocab_size=vocab_size
+    )
+    texts = []
+    for batch_ix in range(batch_size):
+        text_id = generated_ids[batch_ix].cpu().tolist()
+        texts.append([tokenizer.decode_ids(text_id)])
+    return wandb.Table(data=texts, columns=['Story example'])
 
-        if log_output:
-            print('Train loss:', train_losses[-1])
-            print('Val loss:', val_losses[-1])
+    

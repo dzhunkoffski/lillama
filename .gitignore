@@ -164,3 +164,14 @@ data/
 
 
 !/**/.gitkeep
+
+# wandb
+wandb
+
+# archives
+*.zip
+*.gz
+
+# models
+*.vocab
+*.model

@@ -9,6 +9,8 @@ import os
 import io
 from tqdm.autonotebook import tqdm
 import random
+import glob
+import json
 
 class Collator(object):
     def __init__(self, pad_value: int):
@@ -28,11 +30,12 @@ class TextDataset(Dataset):
     def __init__(
             self, 
             corpus_path: str, save_tokenizer_to: str, 
-            max_len: int, vocab_size: int, normalization_rule: str = 'nmt_nfkc_cf', sample: int = None) -> None:
+            max_len: int, vocab_size: int, normalization_rule: str = 'nmt_nfkc_cf', sample: int = None, json_path: str = '') -> None:
         super().__init__()
         self.vocab_size = vocab_size
         self.corpus_path = None
         self.corpus_path = corpus_path
+        self.json_path = json_path
         self.texts = self._load_texts()
         if sample is not None:
             self.texts = random.sample(self.texts, sample)
@@ -44,6 +47,17 @@ class TextDataset(Dataset):
         self.max_len = max_len
     
     def _load_texts(self):
+        if not os.path.exists(self.corpus_path):
+            json_paths = glob.glob(f'{self.json_path}/**.json')
+            data = []
+            for json_file in json_paths:
+                with open(json_file, 'r') as fd:
+                    obj = json.load(fd)
+                for text_ix in range(len(obj)):
+                    data.append(obj[text_ix]['story'])
+            with open(self.corpus_path, 'w') as fd:
+                for line in data:
+                    fd.write(f'{line}\n')
         with open(self.corpus_path, 'r') as fd:
             data = []
             for text in tqdm(fd):
@@ -53,7 +67,7 @@ class TextDataset(Dataset):
     def _load_tokenizer(self, tokenizer_prefix_path: str, vocab_size: int, normalization_rule: str):
         if not os.path.exists(f'{tokenizer_prefix_path}.model'):
             spm.SentencePieceTrainer.train(
-                f'--input={self.corpus_path} --vocab_size={vocab_size} --model_prefix={tokenizer_prefix_path} --pad_id=0 --unk_id=1 --bos_id=2 --eos_id=3 --model_type=bpe --normalization_rule_name={normalization_rule} --input_sentence_size=50000 --shuffle_input_sentence=false'
+                f'--input={self.corpus_path} --vocab_size={vocab_size} --model_prefix={tokenizer_prefix_path} --pad_id=0 --unk_id=1 --bos_id=2 --eos_id=3 --model_type=bpe --normalization_rule_name={normalization_rule} --input_sentence_size=20000 --shuffle_input_sentence=false'
             )
 
         tokenizer = spm.SentencePieceProcessor()
