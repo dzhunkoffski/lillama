@@ -56,6 +56,6 @@ wdb = WandbLogger(
 train(
     model, optimizer, criterion, train_loader, 
     train_loader, 100, DEVICE, wdb, 
-    log_output = False, grad_clipping=10
+    log_output = False, grad_clipping=10, scheduler=lr_scheduler
 )
 
