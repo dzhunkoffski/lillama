@@ -32,11 +32,6 @@ class DecoderBlock(nn.Module):
             sz=x.size()[1], device=x.get_device()
         )
 
-        # print(causal_mask.size())
-        # print(query.size())
-        # print(key.size())
-        # print(value.size())
-
         output, _ = self.masked_multihead_attention(query, key, value, attn_mask=causal_mask)
         output = self.dropout(output)
         output = x + output
