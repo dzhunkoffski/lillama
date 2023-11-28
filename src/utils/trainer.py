@@ -73,18 +73,13 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
         val_loss = validation_epoch(
             model, criterion, val_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
         )
-
-        results = {}
+        logger.set_step((epoch) * len(train_loader.dataset) - 1)
         if scheduler is not None:
             scheduler.step()
-            results["learning rate"] = scheduler.get_last_lr()[0]
-        results["train_loss"] = train_loss
-        results["val loss"] = val_loss
+            logger.log_state("learning_rate", scheduler.get_last_lr()[0])
         train_losses += [train_loss]
         val_losses += [val_loss]
 
-        logger.log_metrics(results)
+        logger.log_state("train_loss", train_loss)
+        logger.log_state("val_loss", val_loss)
 
-        if log_output:
-            print('Train loss:', train_losses[-1])
-            print('Val loss:', val_losses[-1])
