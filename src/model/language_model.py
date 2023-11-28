@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from utils import PositionalEncoding
+from src.model.utils import PositionalEncoding
 
 class DecoderBlock(nn.Module):
     def __init__(self, embed_dim: int, num_heads: int, dropout: float, feedforward_dim: int, activasion):

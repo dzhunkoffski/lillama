@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
 from tqdm import tqdm
-from wandb_logger import WandbLogger
+from src.utils.wandb_logger import WandbLogger
 import math
 
 sns.set_style('whitegrid')
