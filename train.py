@@ -30,14 +30,14 @@ test_loader = DataLoader(test_data, batch_size=768, shuffle=False, num_workers=4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = LanguageModel(
-    embed_dim=1024,
+    embed_dim=512,
     vocab_size=data.vocab_size,
     max_len=data.max_len,
     pad_idx=data.pad_id,
     num_layers=16,
     num_heads=32,
     dropout=0.1,
-    feedforward_dim=2048
+    feedforward_dim=1024
 )
 model = model.to(DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
