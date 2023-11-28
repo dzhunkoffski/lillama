@@ -100,7 +100,8 @@ def train(
         if scheduler is not None:
             scheduler.step()
             logger.log_state("lr", scheduler.get_last_lr()[0])
-
+        
+        logger.set_step(step=(epoch) * len(train_loader.dataset))
         logger.log_state('val_loss', val_loss)
         text_table = log_predictions(
             model, train_loader.dataset.dataset.tokenizer, batch_size=10, device=device, 
