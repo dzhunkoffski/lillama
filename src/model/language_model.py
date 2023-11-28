@@ -1,10 +1,8 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
-
 import numpy as np
 
-from src.model.utils import PositionalEncoding
+from utils import PositionalEncoding
 
 class DecoderBlock(nn.Module):
     def __init__(self, embed_dim: int, num_heads: int, dropout: float, feedforward_dim: int, activasion):
@@ -35,16 +33,21 @@ class DecoderBlock(nn.Module):
             sz=x.size()[1], device=x.get_device()
         )
 
-        output = self.lay_norm1(x)
+        # print(causal_mask.size())
+        # print(query.size())
+        # print(key.size())
+        # print(value.size())
+
         output, _ = self.masked_multihead_attention(query, key, value, attn_mask=causal_mask)
         output = self.dropout(output)
-        x = x + output
+        output = x + output
+        x = self.lay_norm1(output)
 
-        x = self.lay_norm2(output)
         output = self.feedforward(x)
         output = self.dropout(output)
-        output = x + output
 
+        output = x + output
+        x = self.lay_norm2(output)
         return x
 
 class TransformerDecoder(nn.Module):
@@ -96,20 +99,6 @@ class LanguageModel(nn.Module):
         x = self.transformer(x)
         x = self.linear(x)
         return x
-
-    @torch.no_grad()
-    def get_next_token(self, prefix) -> torch.Tensor:
-        """ 
-        Predict text token for given prefix.
-
-        :params
-            prefix -- tensor of shape [batch_size, prefix_len]
-        
-        :returns: 
-            probabilities of next token, 
-        """
-        prob = F.softmax(self.forward(prefix)[:, -1, :], dim=1)
-        return prob
     
     def __str__(self):
         """
