@@ -103,9 +103,9 @@ def train(
 
         logger.log_state('val_loss', val_loss)
         text_table = log_predictions(
-            model, train_loader.dataset.tokenizer, batch_size=10, device=device, 
-            token_len=100, prefix=torch.tensor([train_loader.dataset.bos_id]),
-            vocab_size=train_loader.dataset.vocab_size
+            model, train_loader.dataset.dataset.tokenizer, batch_size=10, device=device, 
+            token_len=100, prefix=torch.tensor([train_loader.dataset.dataset.bos_id]),
+            vocab_size=train_loader.dataset.dataset.vocab_size
         )
         logger.log_state('text_table', text_table)
     
