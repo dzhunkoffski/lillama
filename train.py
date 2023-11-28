@@ -24,20 +24,20 @@ from src.dataset.dataset import Collator
 from src.utils.trainer import CosineAnnealingWithWarmupLR
 
 collate_fn = Collator(pad_value=data.pad_id)
-train_loader = DataLoader(train_data, batch_size=768, shuffle=True, num_workers=4, collate_fn=collate_fn)
-test_loader = DataLoader(test_data, batch_size=768, shuffle=False, num_workers=4, collate_fn=collate_fn)
+train_loader = DataLoader(train_data, batch_size=512, shuffle=True, num_workers=4, collate_fn=collate_fn)
+test_loader = DataLoader(test_data, batch_size=512, shuffle=False, num_workers=4, collate_fn=collate_fn)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = LanguageModel(
-    embed_dim=512,
+    embed_dim=64,
     vocab_size=data.vocab_size,
     max_len=data.max_len,
     pad_idx=data.pad_id,
-    num_layers=16,
-    num_heads=32,
+    num_layers=2,
+    num_heads=2,
     dropout=0.1,
-    feedforward_dim=1024
+    feedforward_dim=64
 )
 model = model.to(DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
