@@ -85,7 +85,7 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
         
         logger.log_state("train_loss", train_loss)
         logger.log_state("val_loss", val_loss)
-        if isinstance(train_loader.dataset, 'torch.utils.data.Subset'):
+        if isinstance(train_loader.dataset, torch.utils.data.Subset):
             tokenizer = train_loader.dataset.dataset.tokenizer
             bos_id = train_loader.dataset.dataset.bos_id
             vocab_sz = train_loader.dataset.dataset.vocab_size
