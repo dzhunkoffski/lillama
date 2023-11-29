@@ -30,10 +30,11 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc):
+def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log):
     train_loss = 0.0
     model.train()
-    for indices, lengths in tqdm(train_loader, desc=tqdm_desc):
+    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
+        log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i)
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
 
@@ -45,6 +46,9 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc)
         optimzier.step()
 
         train_loss += loss.item() * indices.shape[0]
+
+        log.log_state("train_loss", loss.item())
+        log.log_state("grad_norm", get_grad_norm(model))
     
     train_loss /= len(train_loader.dataset)
     return train_loss
@@ -72,13 +76,13 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
         if log_output:
             print(f'=== Epoch {epoch} ===')
         train_loss = training_epoch(
-            model, optimizer, criterion, train_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
+            model, optimizer, criterion, train_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger
         )
         val_loss = validation_epoch(
             model, criterion, val_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
         )
 
-        logger.set_step((epoch) * len(train_loader.dataset))
+        logger.set_step((epoch) * len(train_loader.dataset) - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
@@ -103,8 +107,11 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
 
 def log_predictions(model, tokenizer, batch_size: int, device, token_len: int, prefix: Tensor, vocab_size: int):
     generated_ids = generate_nucleus(
-        model, tokenizer, batch_size=batch_size, device=device, prefix=prefix, max_len=token_len, nucleus=0.9, vocab_size=vocab_size
+        model, tokenizer, batch_size=batch_size, device=device, prefix=prefix, max_len=token_len, nucleus=0.95, vocab_size=vocab_size
     )
+    # generated_ids = generate(
+    #     model, tokenizer, batch_size=batch_size, device=device, prefix=prefix, max_len=token_len
+    # )
     texts = []
     for batch_ix in range(batch_size):
         text_id = generated_ids[batch_ix].cpu().tolist()
@@ -144,3 +151,43 @@ def generate_nucleus(model, tokenizer, batch_size: int, device, prefix: Tensor =
         prefix = torch.cat([prefix, tokens], dim=1)
 
     return prefix
+
+@torch.no_grad()
+def generate(model, tokenizer, batch_size: int, device, prefix: Tensor = None, max_len=100):
+    """
+    Samples output sequence from probability distribution obtained by model.
+    if Tensor of prefix is None then full it with [BOS] token
+
+    :params
+        model: predict next token for the whole batch of sequences
+        tokenizer: tokenizer for the model and [BOS] token
+        batch_size: number of sequence
+        prefix: Tensor of tokens with shape: [batch_size, seq_len]
+        max_len: max length of predicted sequence
+
+    :return
+        the Tensor of tokens of shape: [batch_size, max_len + 1]
+    """
+    bos_id = tokenizer.encode("").ids[0]
+    prefix = torch.tensor([bos_id])
+    prefix = torch.stack(batch_size * [prefix], dim=0)
+    prefix = prefix.to(device)
+    for i in range(max_len):
+        next_token = model.get_next_token(prefix)
+        next_token = next_token = torch.multinomial(next_token, 1)
+        prefix = torch.cat([prefix, next_token], dim=1)
+    return prefix
+
+@torch.no_grad()
+def get_grad_norm(model, norm_type=2):
+    parameters = model.parameters()
+    if isinstance(parameters, torch.Tensor):
+        parameters = [parameters]
+    parameters = [p for p in parameters if p.grad is not None]
+    total_norm = torch.norm(
+        torch.stack(
+            [torch.norm(p.grad.detach(), norm_type).cpu() for p in parameters]
+        ),
+        norm_type,
+    )
+    return total_norm.item()
