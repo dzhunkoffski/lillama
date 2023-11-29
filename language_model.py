@@ -28,23 +28,22 @@ class DecoderBlock(nn.Module):
         self.lay_norm2 = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
-        query = self.Q_proj(x)
-        key = self.K_proj(x)
-        value = self.V_proj(x)
         causal_mask = nn.Transformer.generate_square_subsequent_mask(
             sz=x.size()[1], device=x.get_device()
         )
 
+        output = self.lay_norm1(x)
+        query = self.Q_proj(output)
+        key = self.K_proj(output)
+        value = self.V_proj(output)
         output, _ = self.masked_multihead_attention(query, key, value, attn_mask=causal_mask)
         output = self.dropout(output)
-        output = x + output
-        x = self.lay_norm1(output)
-
-        output = self.feedforward(x)
+        x = x + output
+        
+        output = self.lay_norm2(x)
+        output = self.feedforward(output)
         output = self.dropout(output)
-
-        output = x + output
-        x = self.lay_norm2(output)
+        x = x + output
         return x
 
 class TransformerDecoder(nn.Module):
