@@ -10,7 +10,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, embed_dim: int, num_heads: int, dropout: float, feedforward_dim: int, activasion):
         super().__init__()
         self.Q_proj = nn.Linear(embed_dim, embed_dim)
-        self.  = nn.Linear(embed_dim, embed_dim)
+        self.K_proj = nn.Linear(embed_dim, embed_dim)
         self.V_proj = nn.Linear(embed_dim, embed_dim)
 
         self.masked_multihead_attention = nn.MultiheadAttention(
