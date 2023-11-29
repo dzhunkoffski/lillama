@@ -34,7 +34,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
     train_loss = 0.0
     model.train()
     for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
-        log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i)
+        log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
 
