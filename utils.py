@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch import Tensor
 
 class PositionalEncoding(nn.Module):
 
@@ -41,3 +42,4 @@ class PositionalEncoding(nn.Module):
         seq_len = x.size()[1]
         x = x + self.pe[:, :seq_len, :]
         return x
+

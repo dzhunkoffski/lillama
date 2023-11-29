@@ -1,5 +1,8 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
+
+import numpy as np
 
 from utils import PositionalEncoding
 
@@ -7,7 +10,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, embed_dim: int, num_heads: int, dropout: float, feedforward_dim: int, activasion):
         super().__init__()
         self.Q_proj = nn.Linear(embed_dim, embed_dim)
-        self.K_proj = nn.Linear(embed_dim, embed_dim)
+        self.  = nn.Linear(embed_dim, embed_dim)
         self.V_proj = nn.Linear(embed_dim, embed_dim)
 
         self.masked_multihead_attention = nn.MultiheadAttention(
@@ -43,6 +46,28 @@ class DecoderBlock(nn.Module):
         output = x + output
         x = self.lay_norm2(output)
         return x
+
+    @torch.no_grad()
+    def get_next_token(self, prefix) -> torch.Tensor:
+        """ 
+        Predict text token for given prefix.
+
+        :params
+            prefix -- tensor of shape [batch_size, prefix_len]
+        
+        :returns: 
+            probabilities of next token, 
+        """
+        prob = F.softmax(self.forward(prefix)[:, -1, :], dim=1)
+        return prob
+    
+    def __str__(self):
+        """
+        Model prints with number of trainable parameters
+        """
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        return super().__str__() + "\nTrainable parameters: {}".format(params)
 
 class TransformerDecoder(nn.Module):
     def __init__(
