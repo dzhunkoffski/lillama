@@ -87,7 +87,7 @@ class LanguageModel(nn.Module):
             num_heads=num_heads,
             dropout=dropout,
             feedforward_dim=feedforward_dim,
-            activasion=nn.ReLU
+            activasion=nn.GELU
         )
         self.linear = nn.Linear(embed_dim, vocab_size)
     
