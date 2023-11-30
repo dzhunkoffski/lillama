@@ -47,11 +47,11 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
             optimzier.step()
             optimzier.zero_grad()
+            log.log_state("grad_norm", get_grad_norm(model))
 
         train_loss += loss.item() * indices.shape[0]
 
         log.log_state("train_loss", loss.item())
-        log.log_state("grad_norm", get_grad_norm(model))
     
     train_loss /= len(train_loader.dataset)
     return train_loss
