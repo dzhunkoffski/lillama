@@ -103,7 +103,7 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
             bos_id = train_loader.dataset.bos_id
             vocab_sz = train_loader.dataset.vocab_size
         text_table = log_predictions(
-            model, tokenizer, batch_size=10, device=device, token_len=100, 
+            model, tokenizer, batch_size=10, device=device, token_len=250, 
             prefix=torch.tensor([bos_id]), vocab_size=vocab_sz
         )
         logger.log_state('text_table', text_table)
