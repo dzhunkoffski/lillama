@@ -30,21 +30,23 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log):
+def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum):
     train_loss = 0.0
     model.train()
     for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
         log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
-
-        optimzier.zero_grad()
-        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
-            logits = model(indices[:, :-1])
-            logits = torch.permute(logits, (0, 2, 1))
+        
+        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+        logits = model(indices[:, :-1])
+        logits = torch.permute(logits, (0, 2, 1))
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
-        optimzier.step()
+        
+        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
+            optimzier.step()
+            optimzier.zero_grad()
 
         train_loss += loss.item() * indices.shape[0]
 
@@ -70,14 +72,15 @@ def validation_epoch(model, critetion, val_loader, device, tqdm_desc):
     val_loss /= len(val_loader.dataset)
     return val_loss
 
-def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False):
+def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False, grad_accum: int = 1):
     train_losses, val_losses = [], []
 
     for epoch in range(1, num_epochs + 1):
         if log_output:
             print(f'=== Epoch {epoch} ===')
         train_loss = training_epoch(
-            model, optimizer, criterion, train_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger
+            model, optimizer, criterion, train_loader, device, 
+            tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, grad_accum=grad_accum
         )
         val_loss = validation_epoch(
             model, criterion, val_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
