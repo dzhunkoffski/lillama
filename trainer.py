@@ -39,7 +39,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         # lenghts = lenghts.to(device)
 
         optimzier.zero_grad()
-        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             logits = model(indices[:, :-1])
             logits = torch.permute(logits, (0, 2, 1))
         loss = criterion(logits, indices[:, 1:])
