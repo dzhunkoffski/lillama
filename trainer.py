@@ -30,11 +30,12 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum):
+def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, number_of_batches):
     train_loss = 0.0
     model.train()
     for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
-        log.set_step(step=(epoch - 1) * (len(train_loader)) + i * indices.size()[0])
+        log.set_step(step=(epoch - 1) * (train_loader.batch_size * number_of_batches) + i * indices.size()[0])
+        optimzier.zero_grad()
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
@@ -45,12 +46,8 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
         
-        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
-            optimzier.step()
+        optimzier.step()
         log.log_state("grad_norm", get_grad_norm(model))
-        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
-            optimzier.zero_grad()
-
         train_loss += loss.item() * indices.shape[0]
 
         log.log_state("train_loss", loss.item())
@@ -76,8 +73,7 @@ def validation_epoch(model, critetion, val_loader, device):
 
 def train(
         model, optimizer, criterion, train_loader, val_loader, num_epochs, 
-        device, logger: WandbLogger, train_dataset, scheduler=None, log_output: bool = False, 
-        grad_accum: int = 1):
+        device, logger: WandbLogger, train_dataset, scheduler=None, log_output: bool = False, number_of_batches: int = None):
     train_losses, val_losses = [], []
 
     for epoch in range(1, num_epochs + 1):
@@ -85,13 +81,12 @@ def train(
             print(f'=== Epoch {epoch} ===')
         train_loss = training_epoch(
             model, optimizer, criterion, train_loader, device, 
-            tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, grad_accum=grad_accum,
+            tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, number_of_batches = number_of_batches
         )
         val_loss = validation_epoch(
             model, criterion, val_loader, device
         )
 
-        # logger.set_step((epoch) * len(train_loader) - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
