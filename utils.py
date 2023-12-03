@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch import Tensor
 
-from pathlib import repeat
+from itertools import repeat
 
 def inf_loop(data_loader):
     """wrapper function for endless data loader."""
