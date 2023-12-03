@@ -35,7 +35,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
     train_loss = 0.0
     model.train()
     for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc, total=len_epoch)):
-        log.set_step(step=(epoch - 1) * len(len_epoch) + i * indices.size()[0])
+        log.set_step(step=(epoch - 1) * len_epoch + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
@@ -55,7 +55,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
 
         log.log_state("train_loss", loss.item())
     
-    train_loss /= len(len_epoch)
+    train_loss /= len_epoch
     return train_loss
 
 @torch.no_grad()
@@ -71,7 +71,7 @@ def validation_epoch(model, critetion, val_loader, device, len_epoch):
         loss = critetion(logits, indices[:, 1:])
 
         val_loss += loss.item() * indices.shape[0]
-    val_loss /= len(len_epoch)
+    val_loss /= len_epoch
     return val_loss
 
 def train(
@@ -94,7 +94,7 @@ def train(
             model, criterion, val_loader, device, len_epoch=len_epoch
         )
 
-        logger.set_step((epoch) * len(len_epoch) - 1)
+        logger.set_step((epoch) * len_epoch - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
