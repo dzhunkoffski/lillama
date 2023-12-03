@@ -38,8 +38,9 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
-        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
-            logits = model(indices[:, :-1])
+        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+        logits = model(indices[:, :-1])
+
         logits = torch.permute(logits, (0, 2, 1))
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
@@ -90,7 +91,7 @@ def train(
             model, criterion, val_loader, device
         )
 
-        logger.set_step((epoch) * len(train_loader) - 1)
+        # logger.set_step((epoch) * len(train_loader) - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
