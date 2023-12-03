@@ -51,6 +51,9 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         train_loss += loss.item() * indices.shape[0]
 
         log.log_state("train_loss", loss.item())
+
+        if i == number_of_batches - 1:
+            break
     
     train_loss /= len(train_loader)
     return train_loss
