@@ -2,6 +2,13 @@ import torch
 from torch import nn
 from torch import Tensor
 
+from pathlib import repeat
+
+def inf_loop(data_loader):
+    """wrapper function for endless data loader."""
+    for loader in repeat(data_loader):
+        yield from loader
+
 class PositionalEncoding(nn.Module):
 
     def __init__(self, embed_dim, max_len: int = 5000):

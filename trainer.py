@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from IPython.display import clear_output
 from tqdm import tqdm
 from wandb_logger import WandbLogger
+from utils import inf_loop
 import math
 
 import wandb
@@ -30,10 +31,10 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum):
+def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum, len_epoch):
     train_loss = 0.0
     model.train()
-    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
+    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc, total=len_epoch)):
         log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
@@ -58,10 +59,10 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
     return train_loss
 
 @torch.no_grad()
-def validation_epoch(model, critetion, val_loader, device, tqdm_desc):
+def validation_epoch(model, critetion, val_loader, device, len_epoch):
     val_loss = 0.0
     model.eval()
-    for indices, lengths in tqdm(val_loader):
+    for indices, lengths in tqdm(val_loader, total=len_epoch):
         indices = indices.to(device)
         # lengths = lengths.to(device)
 
@@ -73,8 +74,10 @@ def validation_epoch(model, critetion, val_loader, device, tqdm_desc):
     val_loss /= len(val_loader.dataset)
     return val_loss
 
-def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False, grad_accum: int = 1):
+def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False, grad_accum: int = 1, len_epoch: int = 100000):
     train_losses, val_losses = [], []
+    train_loader = inf_loop(train_loader)
+    val_loader = inf_loop(val_loader)
 
     for epoch in range(1, num_epochs + 1):
         if log_output:
@@ -103,7 +106,7 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
             bos_id = train_loader.dataset.bos_id
             vocab_sz = train_loader.dataset.vocab_size
         text_table = log_predictions(
-            model, tokenizer, batch_size=10, device=device, token_len=250, 
+            model, tokenizer, batch_size=10, device=device, token_len=500, 
             prefix=torch.tensor([bos_id]), vocab_size=vocab_sz
         )
         logger.log_state('text_table', text_table)
