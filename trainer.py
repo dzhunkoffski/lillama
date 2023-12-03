@@ -55,7 +55,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         if i == number_of_batches - 1:
             break
     
-    train_loss /= len(train_loader)
+    train_loss /= (train_loader.batch_size * number_of_batches)
     return train_loss
 
 @torch.no_grad()
@@ -71,7 +71,7 @@ def validation_epoch(model, critetion, val_loader, device):
         loss = critetion(logits, indices[:, 1:])
 
         val_loss += loss.item() * indices.shape[0]
-    val_loss /= len(val_loader)
+    val_loss /= len(val_loader.dataset)
     return val_loss
 
 def train(
