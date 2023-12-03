@@ -35,7 +35,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
     train_loss = 0.0
     model.train()
     for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc, total=len_epoch)):
-        log.set_step(step=(epoch - 1) * len(train_loader.dataset) + i * indices.size()[0])
+        log.set_step(step=(epoch - 1) * len(len_epoch) + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
@@ -55,7 +55,7 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
 
         log.log_state("train_loss", loss.item())
     
-    train_loss /= len(train_loader.dataset)
+    train_loss /= len(len_epoch)
     return train_loss
 
 @torch.no_grad()
@@ -71,10 +71,13 @@ def validation_epoch(model, critetion, val_loader, device, len_epoch):
         loss = critetion(logits, indices[:, 1:])
 
         val_loss += loss.item() * indices.shape[0]
-    val_loss /= len(val_loader.dataset)
+    val_loss /= len(len_epoch)
     return val_loss
 
-def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, device, logger: WandbLogger, scheduler=None, log_output: bool = False, grad_accum: int = 1, len_epoch: int = 100000):
+def train(
+        model, optimizer, criterion, train_loader, val_loader, num_epochs, 
+        device, logger: WandbLogger, train_dataset, scheduler=None, log_output: bool = False, 
+        grad_accum: int = 1, len_epoch: int = 100000):
     train_losses, val_losses = [], []
     train_loader = inf_loop(train_loader)
     val_loader = inf_loop(val_loader)
@@ -91,21 +94,16 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
             model, criterion, val_loader, device, len_epoch=len_epoch
         )
 
-        logger.set_step((epoch) * len(train_loader.dataset) - 1)
+        logger.set_step((epoch) * len(len_epoch) - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
         
         logger.log_state("train_loss", train_loss)
         logger.log_state("val_loss", val_loss)
-        if isinstance(train_loader.dataset, torch.utils.data.Subset):
-            tokenizer = train_loader.dataset.dataset.tokenizer
-            bos_id = train_loader.dataset.dataset.bos_id
-            vocab_sz = train_loader.dataset.dataset.vocab_size
-        else:
-            tokenizer = train_loader.dataset.tokenizer
-            bos_id = train_loader.dataset.bos_id
-            vocab_sz = train_loader.dataset.vocab_size
+        tokenizer = train_dataset.tokenizer
+        bos_id = train_dataset.bos_id
+        vocab_sz = train_dataset.vocab_size
         text_table = log_predictions(
             model, tokenizer, batch_size=10, device=device, token_len=500, 
             prefix=torch.tensor([bos_id]), vocab_size=vocab_sz
