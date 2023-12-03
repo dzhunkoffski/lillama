@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from IPython.display import clear_output
 from tqdm import tqdm
 from wandb_logger import WandbLogger
-from utils import inf_loop
 import math
 
 import wandb
@@ -31,11 +30,11 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
         lr_factor *= min(epoch / self.warmup, 1.0)
         return lr_factor
 
-def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum, len_epoch):
+def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, grad_accum):
     train_loss = 0.0
     model.train()
-    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc, total=len_epoch)):
-        log.set_step(step=(epoch - 1) * len_epoch + i * indices.size()[0])
+    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
+        log.set_step(step=(epoch - 1) * (len(train_loader)) + i * indices.size()[0])
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
@@ -45,24 +44,24 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
         
-        if (i+1) % grad_accum == 0 or (i+1) == len_epoch:
+        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
             optimzier.step()
         log.log_state("grad_norm", get_grad_norm(model))
-        if (i+1) % grad_accum == 0 or (i+1) == len_epoch:
+        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
             optimzier.zero_grad()
 
         train_loss += loss.item() * indices.shape[0]
 
         log.log_state("train_loss", loss.item())
     
-    train_loss /= len_epoch
+    train_loss /= len(train_loader)
     return train_loss
 
 @torch.no_grad()
-def validation_epoch(model, critetion, val_loader, device, len_epoch):
+def validation_epoch(model, critetion, val_loader, device):
     val_loss = 0.0
     model.eval()
-    for indices, lengths in tqdm(val_loader, total=len_epoch):
+    for indices, lengths in tqdm(val_loader):
         indices = indices.to(device)
         # lengths = lengths.to(device)
 
@@ -71,16 +70,14 @@ def validation_epoch(model, critetion, val_loader, device, len_epoch):
         loss = critetion(logits, indices[:, 1:])
 
         val_loss += loss.item() * indices.shape[0]
-    val_loss /= len_epoch
+    val_loss /= len(val_loader)
     return val_loss
 
 def train(
         model, optimizer, criterion, train_loader, val_loader, num_epochs, 
         device, logger: WandbLogger, train_dataset, scheduler=None, log_output: bool = False, 
-        grad_accum: int = 1, len_epoch: int = 100000):
+        grad_accum: int = 1):
     train_losses, val_losses = [], []
-    train_loader = inf_loop(train_loader)
-    val_loader = inf_loop(val_loader)
 
     for epoch in range(1, num_epochs + 1):
         if log_output:
@@ -88,13 +85,12 @@ def train(
         train_loss = training_epoch(
             model, optimizer, criterion, train_loader, device, 
             tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, grad_accum=grad_accum,
-            len_epoch=len_epoch
         )
         val_loss = validation_epoch(
-            model, criterion, val_loader, device, len_epoch=len_epoch
+            model, criterion, val_loader, device
         )
 
-        logger.set_step((epoch) * len_epoch - 1)
+        logger.set_step((epoch) * len(train_loader) - 1)
         if scheduler is not None:
             scheduler.step()
             logger.log_state("learning_rate", scheduler.get_last_lr()[0])
