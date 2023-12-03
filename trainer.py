@@ -45,10 +45,10 @@ def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc,
         loss = criterion(logits, indices[:, 1:])
         loss.backward()
         
-        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
+        if (i+1) % grad_accum == 0 or (i+1) == len_epoch:
             optimzier.step()
         log.log_state("grad_norm", get_grad_norm(model))
-        if (i+1) % grad_accum == 0 or (i+1) == len(train_loader):
+        if (i+1) % grad_accum == 0 or (i+1) == len_epoch:
             optimzier.zero_grad()
 
         train_loss += loss.item() * indices.shape[0]
