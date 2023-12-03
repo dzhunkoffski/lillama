@@ -84,10 +84,11 @@ def train(model, optimizer, criterion, train_loader, val_loader, num_epochs, dev
             print(f'=== Epoch {epoch} ===')
         train_loss = training_epoch(
             model, optimizer, criterion, train_loader, device, 
-            tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, grad_accum=grad_accum
+            tqdm_desc=f'Training {epoch}/{num_epochs}', epoch=epoch, log=logger, grad_accum=grad_accum,
+            len_epoch=len_epoch
         )
         val_loss = validation_epoch(
-            model, criterion, val_loader, device, tqdm_desc=f'Training {epoch}/{num_epochs}'
+            model, criterion, val_loader, device, len_epoch=len_epoch
         )
 
         logger.set_step((epoch) * len(train_loader.dataset) - 1)
