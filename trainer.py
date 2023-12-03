@@ -33,14 +33,14 @@ class CosineAnnealingWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
 def training_epoch(model, optimzier, criterion, train_loader, device, tqdm_desc, epoch, log, number_of_batches):
     train_loss = 0.0
     model.train()
-    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc)):
+    for i, (indices, lengths) in enumerate(tqdm(train_loader, desc=tqdm_desc, total=number_of_batches)):
         log.set_step(step=(epoch - 1) * (train_loader.batch_size * number_of_batches) + i * indices.size()[0])
         optimzier.zero_grad()
         indices = indices.to(device)
         # lenghts = lenghts.to(device)
         
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
-        logits = model(indices[:, :-1])
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            logits = model(indices[:, :-1])
 
         logits = torch.permute(logits, (0, 2, 1))
         loss = criterion(logits, indices[:, 1:])
@@ -76,7 +76,8 @@ def validation_epoch(model, critetion, val_loader, device):
 
 def train(
         model, optimizer, criterion, train_loader, val_loader, num_epochs, 
-        device, logger: WandbLogger, train_dataset, scheduler=None, log_output: bool = False, number_of_batches: int = None):
+        device, logger: WandbLogger, train_dataset, scheduler=None, 
+        log_output: bool = False, number_of_batches: int = None, save_freq: int = 10):
     train_losses, val_losses = [], []
 
     for epoch in range(1, num_epochs + 1):
@@ -106,6 +107,9 @@ def train(
         logger.log_state('text_table', text_table)
         train_losses += [train_loss]
         val_losses += [val_loss]
+
+        if epoch % save_freq == 0:
+            torch.save(model.state_dict(), 'model.pth')
 
 def log_predictions(model, tokenizer, batch_size: int, device, token_len: int, prefix: Tensor, vocab_size: int):
     generated_ids = generate_nucleus(
