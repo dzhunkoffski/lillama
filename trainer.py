@@ -174,8 +174,9 @@ def generate(model, tokenizer, batch_size: int, device, prefix: Tensor = None, m
     :return
         the Tensor of tokens of shape: [batch_size, max_len + 1]
     """
-    bos_id = tokenizer.encode("").ids[0]
-    prefix = torch.tensor([bos_id])
+    if prefix is None:
+        bos_id = tokenizer.encode("").ids[0]
+        prefix = torch.tensor([bos_id])
     prefix = torch.stack(batch_size * [prefix], dim=0)
     prefix = prefix.to(device)
     for i in range(max_len):
@@ -183,6 +184,18 @@ def generate(model, tokenizer, batch_size: int, device, prefix: Tensor = None, m
         next_token = next_token = torch.multinomial(next_token, 1)
         prefix = torch.cat([prefix, next_token], dim=1)
     return prefix
+
+def generate_from_text(model, tokenizer, batch_size: int, device, prefix: str = None, max_len=500, nucleus=0.95, vocab_size=1000):
+    if prefix is not None:
+        prefix = tokenizer.encode(prefix).ids
+        prefix = torch.tensor(prefix)
+    
+    generated_ids = generate_nucleus(model, tokenizer, batch_size, device, prefix, max_len, nucleus, vocab_size)
+    texts = []
+    for batch_ix in range(batch_size):
+        text_id = generated_ids[batch_ix].cpu().tolist()
+        texts.append([tokenizer.decode_ids(text_id)])
+    return texts
 
 @torch.no_grad()
 def get_grad_norm(model, norm_type=2):
